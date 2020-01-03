@@ -1,5 +1,5 @@
 # Drone Rsync Plugin
-This is a fork of an [Rsync Plugin](https://github.com/Drillster/drone-rsync) for [Drone](https://drone.io/) that simply uses `rsync` to deploy a set of files to a remote directory on a server. This fork exists as a level of indirection in case the original plugin disappears (since it is a comminity Drone plugin).
+This fork is a mirror of [Rsync Plugin](https://github.com/Drillster/drone-rsync) for [Drone](https://drone.io/) that simply uses `rsync` to deploy a set of files to a remote directory on a server. This fork exists as a level of indirection in case the original plugin disappears (since it is a comminity Drone plugin).
 
 ## Usage
 
