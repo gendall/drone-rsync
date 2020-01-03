@@ -1,33 +1,99 @@
-# drone-rsync
-[![drone-rsync on Docker Hub](https://img.shields.io/docker/automated/drillster/drone-rsync.svg)](https://hub.docker.com/r/drillster/drone-rsync/)
-
-This is a pure Bash [Drone](https://github.com/drone/drone) >= 0.5 plugin to sync files to remote hosts.
-
-For more information on how to use the plugin, please take a look at the docs:
-
-- For Drone CI versions `< 1` : https://github.com/Drillster/drone-rsync/blob/master/0-DOCS.md
-- For Drone CI versions `>= 1` : https://github.com/Drillster/drone-rsync/blob/master/1-DOCS.md
-
-## Docker
-Build the docker image by running:
-
-```bash
-docker build --rm=true -t drillster/drone-rsync .
-```
+# Drone Rsync Plugin
+This is a fork of an [Rsync Plugin](https://github.com/Drillster/drone-rsync) for [Drone](https://drone.io/) that simply uses `rsync` to deploy a set of files to a remote directory on a server. This fork exists as a level of indirection in case the original plugin disappears (since it is a comminity Drone plugin).
 
 ## Usage
-Execute from the working directory (assuming you have an SSH server running on 127.0.0.1:22):
 
-```bash
-docker run --rm \
-  -e PLUGIN_KEY=$(cat some-private-key) \
-  -e PLUGIN_HOSTS="127.0.0.1, 127.0.0.2, 127.0.0.3" \
-  -e PLUGIN_PORTS="22, 23, 24" \
-  -e PLUGIN_TARGET="./" \
-  -e PLUGIN_PRESCRIPT="echo \"Prescript Done!\"" \
-  -e PLUGIN_SCRIPT="echo \"Postscript Done!\"" \
-  -e PLUGIN_ARGS="--blocking-io" \
-  -v $(pwd):$(pwd) \
-  -w $(pwd) \
-  drillster/drone-rsync
+Use the plugin to synchronize files to remote hosts, and execute arbitrary commands on those hosts.
+
+## Config
+The following parameters are used to configure the plugin:
+- **user** - user to log in as on the remote machines, defaults to `root`
+- **key** - private SSH key for the remote machines
+- **hosts** - hostnames or ip-addresses of the remote machines
+- **port** - port to connect to on the remote machines, defaults to `22`
+- **source** - source folder to synchronize from, defaults to `./`
+- **target** - target folder on remote machines to synchronize to
+- **include** - rsync include filter
+- **exclude** - rsync exclude filter
+- **recursive** - recursively synchronize, defaults to `false`
+- **delete** - delete target folder contents, defaults to `false`
+- **prescript** - list of commands to execute on remote machines before rsync occurs
+- **script** - list of commands to execute on remote machines after rsync occurs
+
+## Secrets
+The following secrets can be used to secure the sensitive parts of your configuration:
+- **rsync_key** - private SSH key for the remote machines
+- **rsync_user** - user to log in as on the remote machines
+
+It is highly recommended to put your private key into a secret (`rsync_key`) so it is not exposed to users. This can be done using the drone-cli:
+
+```sh
+drone secret add \
+   --repository your/repo \
+   --name rsync_key \
+   --value @./id_rsa \
 ```
+
+Add the secret to your `.drone.yml`:
+```yaml
+kind: pipeline
+
+steps:
+- name: rsync
+  image: drillster/drone-rsync
+  environment:
+    RSYNC_KEY:
+      from_secret: rsync_key
+  settings:
+    user: some-user
+    hosts:
+      - remote1
+    source: ./dist
+    target: ~/packages
+    secrets: [ rsync_key ]
+```
+
+See the [secret guides](https://docs.drone.io/user-guide/secrets/pre-repository/) for additional information on secrets.
+
+## Examples
+```yaml
+kind: pipeline
+name: default
+
+steps:
+- name: rsync
+  image: drillster/drone-rsync
+  environment:
+    RSYNC_KEY:
+      from_secret: rsync_key
+    RSYNC_USER:
+      from_secret: rsync_user
+  settings:
+    hosts:
+      - remote1
+      - remote2
+    source: ./dist
+    target: ~/packages
+    include:
+      - "app.tar.gz"
+      - "app.tar.gz.md5"
+    exclude:
+      - "**.*"
+    prescript:
+      - cd ~/packages
+      - md5sum -c app.tar.gz.md5
+      - tar -xf app.tar.gz -C ~/app    
+    script: 
+      - cd ~/packages
+      - md5sum -c app.tar.gz.md5
+      - tar -xf app.tar.gz -C ~/app
+```
+
+The example above illustrates a situation where an app package (`app.tar.gz`) will be deployed to 2 remote hosts (`remote1` and `remote2`). An md5 checksum will be deployed as well. After deploying, the md5 checksum is used to check the deployed package. If successful the package is extracted.
+
+## Important
+The script passed to **script** will be executed on remote machines directly after rsync completes to deploy the files. It will be executed step by step until a command returns a non-zero exit-code. If this happens, the entire plugin will exit and fail the build.
+
+## Deployment
+
+This image will be automatically built and deployed to [DockerHub](https://hub.docker.com/u/gendall) when a [Semver](https://semver.org) tag is pushed to the repo.
