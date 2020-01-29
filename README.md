@@ -28,7 +28,7 @@ name: default
 
 steps:
 - name: build
-  image: node
+  image: gendall/drone-node
   commands:
     - npm install
 
